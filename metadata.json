@@ -1,0 +1,8 @@
+{
+  "name": "Remix Remix SMARTSTUDENT AI",
+  "description": "A centralized digital platform connecting students with learning resources, skills development, internships, scholarships, career guidance, and AI-powered recommendations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
