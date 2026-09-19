@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, ShieldCheck, Lock, Mail, Loader2, AlertCircle, KeyRound, CheckCircle2 } from 'lucide-react';
+import { parseResponseSafely } from '../utils/api';
 
 interface AdminLoginModalProps {
   isOpen: boolean;
@@ -37,10 +38,10 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
         body: JSON.stringify({ email: email.trim(), password }),
       });
 
-      const data = await res.json();
+      const { data, error: parseErr } = await parseResponseSafely<any>(res);
 
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Invalid administrator credentials');
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || parseErr || 'Invalid administrator credentials');
       }
 
       onLoginSuccess(data.token, data.user);

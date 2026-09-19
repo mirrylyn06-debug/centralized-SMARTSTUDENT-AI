@@ -21,6 +21,7 @@ import {
   Server
 } from 'lucide-react';
 import { Application, Course, Opportunity, PlatformStats } from '../types';
+import { parseResponseSafely } from '../utils/api';
 
 interface AdminTabProps {
   stats: PlatformStats;
@@ -50,8 +51,13 @@ export const AdminTab: React.FC<AdminTabProps> = ({
   useEffect(() => {
     if (activeAdminSubTab === 'database') {
       fetch('/api/database/status')
-        .then(r => r.json())
-        .then(data => setDbStatus(data))
+        .then(async r => {
+          const { data } = await parseResponseSafely<any>(r, null);
+          return data;
+        })
+        .then(data => {
+          if (data) setDbStatus(data);
+        })
         .catch(err => console.error('Failed to load DB status:', err));
     }
   }, [activeAdminSubTab]);

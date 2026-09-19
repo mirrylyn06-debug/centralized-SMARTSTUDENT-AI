@@ -14,6 +14,7 @@ import {
   BookOpen
 } from 'lucide-react';
 import { DocumentItem, StudentProfile } from '../types';
+import { parseResponseSafely } from '../utils/api';
 
 interface DocumentsTabProps {
   documents: DocumentItem[];
@@ -63,8 +64,10 @@ export const DocumentsTab: React.FC<DocumentsTabProps> = ({
           documentType: doc.type,
         })
       });
-      const data = await res.json();
-      setAnalysisResult({ ...data, docName: doc.name });
+      const { data } = await parseResponseSafely<any>(res);
+      if (data) {
+        setAnalysisResult({ ...data, docName: doc.name });
+      }
     } catch (err) {
       console.error('Document analysis error:', err);
     } finally {

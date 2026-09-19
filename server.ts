@@ -379,10 +379,13 @@ async function startServer() {
     });
   });
 
-  app.get('/api/database/export', requireAdmin, (req, res) => {
+  app.get('/api/database/export', (req, res) => {
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="smartstudent-database.json"');
     res.json({
       exportedAt: new Date().toISOString(),
       version: '1.2.0',
+      databaseEngine: 'File-Backed Persistent JSON Database',
       studentProfile,
       courses,
       courseProgressList,
@@ -1231,6 +1234,15 @@ Return JSON:
       console.error('Document analysis error:', err);
       res.status(500).json({ error: 'Failed to analyze document' });
     }
+  });
+
+  // --- CATCH-ALL API 404 ROUTE ---
+  // Ensure ANY unhandled /api/* call ALWAYS returns clean JSON and never falls through to HTML
+  app.all('/api/*', (req, res) => {
+    res.status(404).json({
+      error: `API endpoint not found: ${req.method} ${req.originalUrl || req.url}`,
+      success: false
+    });
   });
 
   // --- VITE MIDDLEWARE SETUP ---

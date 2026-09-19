@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { parseResponseSafely } from '../utils/api';
 import { 
   KeyRound, 
   Copy, 
@@ -60,8 +61,8 @@ export const CredentialsModal: React.FC<CredentialsModalProps> = ({
     try {
       const res = await fetch('/api/database/status');
       if (res.ok) {
-        const data = await res.json();
-        setDbStatus(data);
+        const { data } = await parseResponseSafely<DatabaseStatusData>(res, null as any);
+        if (data) setDbStatus(data);
       }
     } catch {
       // fallback

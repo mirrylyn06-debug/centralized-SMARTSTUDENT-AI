@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { Opportunity, OpportunityMatchReport, StudentProfile, Application, DocumentItem } from '../types';
 import { calculateOpportunityMatch } from '../utils/matching';
+import { parseResponseSafely } from '../utils/api';
 
 interface OpportunitiesTabProps {
   opportunities: Opportunity[];
@@ -119,8 +120,8 @@ export const OpportunitiesTab: React.FC<OpportunitiesTabProps> = ({
           customNotes: applicationNotes
         })
       });
-      const data = await res.json();
-      if (data.letter) {
+      const { data } = await parseResponseSafely<any>(res);
+      if (data?.letter) {
         setCoverLetter(data.letter);
       }
     } catch (err) {

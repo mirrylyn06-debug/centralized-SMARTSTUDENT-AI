@@ -39,6 +39,7 @@ import { Loader2, Bell, X, CheckCircle2, ArrowRight, ShieldAlert, ShieldCheck, L
 import { AdminLoginModal } from './components/AdminLoginModal';
 import { RegistrationModal } from './components/RegistrationModal';
 import { CredentialsModal } from './components/CredentialsModal';
+import { parseResponseSafely } from './utils/api';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>('dashboard');
@@ -85,8 +86,8 @@ export default function App() {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
-        const data = await res.json();
-        if (data.authenticated && data.role === 'admin') {
+        const { data } = await parseResponseSafely<any>(res);
+        if (data?.authenticated && data?.role === 'admin') {
           setIsAuthenticatedAdmin(true);
           return;
         }
@@ -101,6 +102,16 @@ export default function App() {
   // Initial Fetch from Express Backend
   const fetchAllData = async () => {
     try {
+      const fetchJson = async <T,>(url: string, fallback: T): Promise<T> => {
+        try {
+          const r = await fetch(url);
+          const { data } = await parseResponseSafely<T>(r, fallback);
+          return data ?? fallback;
+        } catch {
+          return fallback;
+        }
+      };
+
       const [
         profileRes, 
         coursesRes, 
@@ -112,23 +123,23 @@ export default function App() {
         notifsRes,
         statsRes
       ] = await Promise.allSettled([
-        fetch('/api/profile').then(r => r.ok ? r.json() : mockStudentProfile),
-        fetch('/api/courses').then(r => r.ok ? r.json() : mockCourses),
-        fetch('/api/courses/progress').then(r => r.ok ? r.json() : []),
-        fetch('/api/opportunities').then(r => r.ok ? r.json() : mockOpportunities),
-        fetch('/api/opportunities/matches').then(r => r.ok ? r.json() : []),
-        fetch('/api/applications').then(r => r.ok ? r.json() : mockApplications),
-        fetch('/api/documents').then(r => r.ok ? r.json() : mockDocuments),
-        fetch('/api/notifications').then(r => r.ok ? r.json() : mockNotifications),
-        fetch('/api/stats').then(r => r.ok ? r.json() : mockPlatformStats),
+        fetchJson('/api/profile', mockStudentProfile),
+        fetchJson('/api/courses', mockCourses),
+        fetchJson('/api/courses/progress', []),
+        fetchJson('/api/opportunities', mockOpportunities),
+        fetchJson('/api/opportunities/matches', []),
+        fetchJson('/api/applications', mockApplications),
+        fetchJson('/api/documents', mockDocuments),
+        fetchJson('/api/notifications', mockNotifications),
+        fetchJson('/api/stats', mockPlatformStats),
       ]);
 
       if (profileRes.status === 'fulfilled' && profileRes.value) {
-        const val = profileRes.value;
+        const val: any = profileRes.value;
         setProfile(val.profile || val);
       }
       if (coursesRes.status === 'fulfilled' && coursesRes.value) {
-        const val = coursesRes.value;
+        const val: any = coursesRes.value;
         if (Array.isArray(val)) {
           setCourses(val);
         } else if (val && Array.isArray(val.courses)) {
@@ -139,35 +150,35 @@ export default function App() {
         }
       }
       if (progressRes.status === 'fulfilled' && progressRes.value) {
-        const val = progressRes.value;
+        const val: any = progressRes.value;
         if (Array.isArray(val) && val.length > 0) {
           setProgressList(val);
         }
       }
       if (oppsRes.status === 'fulfilled' && oppsRes.value) {
-        const val = oppsRes.value;
+        const val: any = oppsRes.value;
         setOpportunities(Array.isArray(val) ? val : (Array.isArray(val?.opportunities) ? val.opportunities : mockOpportunities));
       }
       if (matchesRes.status === 'fulfilled' && matchesRes.value) {
-        const val = matchesRes.value;
+        const val: any = matchesRes.value;
         setMatches(Array.isArray(val) ? val : (Array.isArray(val?.matches) ? val.matches : []));
       }
       if (appsRes.status === 'fulfilled' && appsRes.value) {
-        const val = appsRes.value;
+        const val: any = appsRes.value;
         setApplications(Array.isArray(val) ? val : (Array.isArray(val?.applications) ? val.applications : mockApplications));
       }
       if (docsRes.status === 'fulfilled' && docsRes.value) {
-        const val = docsRes.value;
+        const val: any = docsRes.value;
         setDocuments(Array.isArray(val) ? val : (Array.isArray(val?.documents) ? val.documents : mockDocuments));
       }
       if (notifsRes.status === 'fulfilled' && notifsRes.value) {
-        const val = notifsRes.value;
+        const val: any = notifsRes.value;
         if (Array.isArray(val)) {
           setNotifications(val);
         }
       }
       if (statsRes.status === 'fulfilled' && statsRes.value) {
-        const val = statsRes.value;
+        const val: any = statsRes.value;
         setStats(val.stats || val);
       }
     } catch (err) {
@@ -191,16 +202,18 @@ export default function App() {
         body: JSON.stringify({ lessonId, completed })
       });
       if (res.ok) {
-        const updatedProg: CourseProgress = await res.json();
-        setProgressList(prev => {
-          const idx = prev.findIndex(p => p.courseId === courseId);
-          if (idx >= 0) {
-            const next = [...prev];
-            next[idx] = updatedProg;
-            return next;
-          }
-          return [...prev, updatedProg];
-        });
+        const { data } = await parseResponseSafely<CourseProgress>(res);
+        if (data && data.courseId) {
+          setProgressList(prev => {
+            const idx = prev.findIndex(p => p.courseId === courseId);
+            if (idx >= 0) {
+              const next = [...prev];
+              next[idx] = data;
+              return next;
+            }
+            return [...prev, data];
+          });
+        }
       }
     } catch (err) {
       console.error(err);
@@ -232,8 +245,11 @@ export default function App() {
         })
       });
       if (res.ok) {
-        const newApp: Application = await res.json();
-        setApplications(prev => [newApp, ...prev.filter(a => a.id !== newApp.id)]);
+        const { data } = await parseResponseSafely<Application>(res);
+        const newApp = data?.id ? data : (data as any)?.application;
+        if (newApp && newApp.id) {
+          setApplications(prev => [newApp, ...prev.filter(a => a.id !== newApp.id)]);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -251,8 +267,11 @@ export default function App() {
         })
       });
       if (res.ok) {
-        const newApp: Application = await res.json();
-        setApplications(prev => [newApp, ...prev.filter(a => a.id !== newApp.id)]);
+        const { data } = await parseResponseSafely<Application>(res);
+        const newApp = data?.id ? data : (data as any)?.application;
+        if (newApp && newApp.id) {
+          setApplications(prev => [newApp, ...prev.filter(a => a.id !== newApp.id)]);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -272,8 +291,11 @@ export default function App() {
         body: JSON.stringify({ status, notes, interviewDate })
       });
       if (res.ok) {
-        const updated: Application = await res.json();
-        setApplications(prev => prev.map(a => a.id === applicationId ? updated : a));
+        const { data } = await parseResponseSafely<Application>(res);
+        const updated = data?.id ? data : (data as any)?.application;
+        if (updated && updated.id) {
+          setApplications(prev => prev.map(a => a.id === applicationId ? updated : a));
+        }
       }
     } catch (err) {
       console.error(err);
@@ -288,8 +310,11 @@ export default function App() {
         body: JSON.stringify({ name, type, fileSize })
       });
       if (res.ok) {
-        const newDoc: DocumentItem = await res.json();
-        setDocuments(prev => [newDoc, ...prev]);
+        const { data } = await parseResponseSafely<DocumentItem>(res);
+        const newDoc = data?.id ? data : (data as any)?.document;
+        if (newDoc && newDoc.id) {
+          setDocuments(prev => [newDoc, ...prev]);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -315,13 +340,19 @@ export default function App() {
         body: JSON.stringify(updated)
       });
       if (res.ok) {
-        const saved = await res.json();
-        setProfile(saved);
-        // Refresh matches
+        const { data: saved } = await parseResponseSafely<StudentProfile>(res);
+        if (saved && saved.id) {
+          setProfile(saved);
+        }
+        // Refresh matches safely
         const mRes = await fetch('/api/opportunities/matches');
         if (mRes.ok) {
-          const freshMatches = await mRes.json();
-          setMatches(freshMatches);
+          const { data: freshMatches } = await parseResponseSafely<any>(mRes, []);
+          if (Array.isArray(freshMatches)) {
+            setMatches(freshMatches);
+          } else if (freshMatches && typeof freshMatches === 'object') {
+            setMatches(Object.values(freshMatches));
+          }
         }
       }
     } catch (err) {
@@ -335,15 +366,29 @@ export default function App() {
     localStorage.setItem('smartstudent_registered_email', newProfile.email);
     setIsRegistrationOpen(false);
     
-    // Refresh matches and notifications
+    // Refresh matches and notifications safely
     try {
+      const fetchJson = async <T,>(url: string, fallback: T): Promise<T> => {
+        try {
+          const r = await fetch(url);
+          const { data } = await parseResponseSafely<T>(r, fallback);
+          return data ?? fallback;
+        } catch {
+          return fallback;
+        }
+      };
+
       const [matchesRes, notifsRes] = await Promise.allSettled([
-        fetch('/api/opportunities/matches').then(r => r.ok ? r.json() : []),
-        fetch('/api/notifications').then(r => r.ok ? r.json() : [])
+        fetchJson('/api/opportunities/matches', []),
+        fetchJson('/api/notifications', [])
       ]);
       if (matchesRes.status === 'fulfilled' && matchesRes.value) {
         const val = matchesRes.value;
-        setMatches(Array.isArray(val) ? val : (Array.isArray(val?.matches) ? val.matches : []));
+        if (Array.isArray(val)) {
+          setMatches(val);
+        } else if (val && typeof val === 'object') {
+          setMatches(Object.values(val));
+        }
       }
       if (notifsRes.status === 'fulfilled' && notifsRes.value && Array.isArray(notifsRes.value)) {
         setNotifications(notifsRes.value);
@@ -397,10 +442,12 @@ export default function App() {
         body: JSON.stringify(oppData)
       });
       if (res.ok) {
-        const data = await res.json();
-        const created = data.opportunity || data;
-        setOpportunities(prev => [created, ...prev]);
-        setStats(prev => ({ ...prev, activeOpportunities: prev.activeOpportunities + 1 }));
+        const { data } = await parseResponseSafely<any>(res);
+        const created = data?.opportunity || data;
+        if (created && created.id) {
+          setOpportunities(prev => [created, ...prev]);
+          setStats(prev => ({ ...prev, activeOpportunities: prev.activeOpportunities + 1 }));
+        }
       }
     } catch (err) {
       console.error(err);
@@ -419,10 +466,12 @@ export default function App() {
         body: JSON.stringify(courseData)
       });
       if (res.ok) {
-        const data = await res.json();
-        const created = data.course || data;
-        setCourses(prev => [created, ...prev]);
-        setStats(prev => ({ ...prev, totalCourses: prev.totalCourses + 1 }));
+        const { data } = await parseResponseSafely<any>(res);
+        const created = data?.course || data;
+        if (created && created.id) {
+          setCourses(prev => [created, ...prev]);
+          setStats(prev => ({ ...prev, totalCourses: prev.totalCourses + 1 }));
+        }
       }
     } catch (err) {
       console.error(err);

@@ -24,6 +24,7 @@ import {
   KeyRound
 } from 'lucide-react';
 import { StudentProfile } from '../types';
+import { parseResponseSafely } from '../utils/api';
 
 interface RegistrationModalProps {
   isOpen: boolean;
@@ -127,9 +128,9 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: email.trim(), password })
         });
-        const data = await res.json();
-        if (!res.ok || !data.success) {
-          throw new Error(data.error || 'Student sign-in failed. Please check your credentials.');
+        const { data, error: parseErr } = await parseResponseSafely<any>(res);
+        if (!res.ok || !data?.success) {
+          throw new Error(data?.error || parseErr || 'Student sign-in failed. Please check your credentials.');
         }
         onRegisterSuccess(data.profile, data.token);
         onClose();
@@ -168,9 +169,9 @@ export const RegistrationModal: React.FC<RegistrationModalProps> = ({
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Registration failed. Please try again.');
+      const { data, error: parseErr } = await parseResponseSafely<any>(res);
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || parseErr || 'Registration failed. Please try again.');
       }
 
       onRegisterSuccess(data.profile, data.token);

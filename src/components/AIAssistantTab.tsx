@@ -18,6 +18,7 @@ import {
   HelpCircle
 } from 'lucide-react';
 import { ChatMessage, SkillsGapAnalysisResult, StudentProfile } from '../types';
+import { parseResponseSafely } from '../utils/api';
 
 interface AIAssistantTabProps {
   profile: StudentProfile;
@@ -98,16 +99,20 @@ How can I support you today? You can ask me to:
           conversationHistory: messages
         })
       });
-      const data = await res.json();
+      const { data } = await parseResponseSafely<any>(res);
 
-      const assistantMsg: ChatMessage = {
-        id: `msg-${Date.now() + 1}`,
-        sender: 'assistant',
-        content: data.reply,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        suggestions: data.suggestions || []
-      };
-      setMessages(prev => [...prev, assistantMsg]);
+      if (data?.reply) {
+        const assistantMsg: ChatMessage = {
+          id: `msg-${Date.now() + 1}`,
+          sender: 'assistant',
+          content: data.reply,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          suggestions: data.suggestions || []
+        };
+        setMessages(prev => [...prev, assistantMsg]);
+      } else {
+        throw new Error('No reply received');
+      }
     } catch (err) {
       console.error('AI chat error:', err);
       const fallbackMsg: ChatMessage = {
@@ -132,8 +137,10 @@ How can I support you today? You can ask me to:
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ targetRole: targetRoleInput })
       });
-      const data = await res.json();
-      setSkillsGapResult(data);
+      const { data } = await parseResponseSafely<any>(res);
+      if (data) {
+        setSkillsGapResult(data);
+      }
     } catch (err) {
       console.error('Skills gap error:', err);
     } finally {
@@ -149,8 +156,10 @@ How can I support you today? You can ask me to:
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
-      const data = await res.json();
-      setCareerGuidanceData(data);
+      const { data } = await parseResponseSafely<any>(res);
+      if (data) {
+        setCareerGuidanceData(data);
+      }
     } catch (err) {
       console.error('Guidance error:', err);
     } finally {
