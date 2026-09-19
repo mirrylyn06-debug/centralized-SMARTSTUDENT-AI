@@ -11,29 +11,53 @@ export interface SafeApiResponse<T = any> {
   error?: string;
 }
 
+export interface SafeParseResult<T = any> {
+  data: T;
+  error?: string;
+  is404?: boolean;
+  isProxyError?: boolean;
+}
+
 export async function parseResponseSafely<T = any>(
   response: Response,
   fallback: T = {} as T
-): Promise<{ data: T; error?: string }> {
+): Promise<SafeParseResult<T>> {
+  const is404 = response.status === 404;
+
   try {
     const contentType = response.headers.get('content-type') || '';
     if (contentType.includes('application/json')) {
       const parsed = await response.json();
-      return { data: parsed, error: parsed?.error };
+      return { 
+        data: parsed, 
+        error: parsed?.error,
+        is404
+      };
     }
 
-    // Response is HTML or plain text (e.g., 404/500 proxy error)
+    // Response is HTML or plain text (e.g., 404/500 proxy error, Vercel/Cloudflare edge page)
     const text = await response.text();
-    const cleanText = text.replace(/<[^>]*>?/gm, '').trim().slice(0, 120);
+    const isEdgeProxyPage = text.includes('NOT_FOUND') || text.includes('The page could not be found') || text.includes('cpt1::') || text.includes('Deployment Not Found');
+
+    let cleanText = text.replace(/<[^>]*>?/gm, '').trim();
+    if (isEdgeProxyPage || is404) {
+      cleanText = 'Service endpoint not found or backend initializing';
+    } else {
+      cleanText = cleanText.slice(0, 100);
+    }
+
     return {
       data: fallback,
+      is404,
+      isProxyError: isEdgeProxyPage,
       error: response.ok 
         ? 'Unexpected non-JSON response from server.' 
-        : `Server error (${response.status}): ${cleanText || 'Service unavailable'}`
+        : `Server error (${response.status}): ${cleanText}`
     };
   } catch (err: any) {
     return {
       data: fallback,
+      is404,
       error: err?.message || 'Failed to parse response'
     };
   }
